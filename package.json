@@ -11,12 +11,17 @@
     "postinstall": "node scripts/postinstall.js"
   },
   "dependencies": {
+    "@aa-sdk/core": "^4.40.0",
     "@account-kit/core": "4.35.1",
     "@account-kit/infra": "4.35.1",
     "@account-kit/react": "4.35.1",
+    "@account-kit/smart-contracts": "^4.40.0",
+    "@alchemy/aa-accounts": "^3.19.0",
+    "@radix-ui/react-label": "^2.1.7",
     "@radix-ui/react-slot": "^1.2.3",
     "@radix-ui/react-tooltip": "^1.2.7",
     "@tanstack/react-query": "^5.50.1",
+    "@wagmi/core": "^2.17.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.511.0",
@@ -34,6 +39,7 @@
     "@types/react-dom": "^18",
     "eslint": "^8.57.0",
     "eslint-config-next": "14.2.4",
+    "pino-pretty": "^13.0.0",
     "postcss": "^8",
     "tailwindcss": "^3.4.4",
     "typescript": "^5"

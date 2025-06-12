@@ -8,3 +8,10 @@ export const NFT_MINTABLE_ABI_PARSED = parseAbi([
   "function baseURI() view returns (string)",
   "function balanceOf(address owner) view returns (uint256)",
 ] as const);
+
+export const USDC_CONTRACT_ADDRESS =
+  "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
+
+export const USDC_ABI = parseAbi([
+  "function transfer(address to, uint256 amount) returns (bool)",
+] as const);
