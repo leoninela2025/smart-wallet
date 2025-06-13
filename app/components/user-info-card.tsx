@@ -47,10 +47,10 @@ export default function UserInfo() {
   const [userOpHash, setUserOpHash] = useState<Hex | null>(null);
   const [ownerEoaAddress, setOwnerEoaAddress] = useState<Address | null>(null);
 
-  // Generate the AI agent account once and store it in state.
-  // This ensures that we use the same agent address for all permit actions.
-  const [agentAccount] = useState<PrivateKeyAccount>(() =>
-    privateKeyToAccount(generatePrivateKey())
+  // Store the raw private key in state
+  const [agentPrivateKey] = useState<Hex>(() => generatePrivateKey());
+  const [agentAccount] = useState<PrivateKeyAccount>(() => 
+    privateKeyToAccount(agentPrivateKey)
   );
 
   useEffect(() => {
@@ -89,7 +89,7 @@ export default function UserInfo() {
       const agentSignerAddress = agentAccount.address;
       setAiAgentAddress(agentSignerAddress);
 
-      const sessionKeyEntityId = 1;
+      const sessionKeyEntityId = 6;
       const hookEntityId = 2;
       const now = Math.floor(Date.now() / 1000);
       const oneHour = 60 * 60;
@@ -134,6 +134,9 @@ export default function UserInfo() {
       setUserOpHash(result.hash);
 
       await modularClient.waitForUserOperationTransaction(result);
+
+      localStorage.setItem("aiAgentPrivateKey", agentPrivateKey);
+      localStorage.setItem("sessionKeyEntityId", String(sessionKeyEntityId));
     } catch (e) {
       console.error("Failed to permit agent:", e);
     } finally {
