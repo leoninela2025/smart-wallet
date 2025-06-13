@@ -17,22 +17,12 @@ import {
 } from "@/components/ui/tooltip";
 import { formatAddress } from "@/lib/utils";
 import { useUser, useSmartAccountClient, useSigner } from "@account-kit/react";
-import {
-  installValidationActions,
-  SingleSignerValidationModule,
-  getDefaultSingleSignerValidationModuleAddress,
-  semiModularAccountBytecodeAbi,
-  HookType,
-  TimeRangeModule,
-  getDefaultTimeRangeModuleAddress,
-} from "@account-kit/smart-contracts/experimental";
+import { installValidationActions } from "@account-kit/smart-contracts/experimental";
 import { type ModularAccountV2 } from "@account-kit/smart-contracts";
 import { baseSepolia, type AlchemySmartAccountClient } from "@account-kit/infra";
-import { generatePrivateKey, privateKeyToAccount, type PrivateKeyAccount } from "viem/accounts";
-import { getAbiItem, toFunctionSelector, type Address, type Hex, type Chain } from "viem";
+import { type Address, type Hex, type Chain } from "viem";
 import { Spinner } from "./spinner";
 import { type AlchemySigner } from "@account-kit/core";
-
 
 export default function UserInfo() {
   const [isCopied, setIsCopied] = useState(false);
@@ -41,17 +31,10 @@ export default function UserInfo() {
   const { client } = useSmartAccountClient({});
   const signer = useSigner();
 
-  // New state variables for session key
   const [isPermitting, setIsPermitting] = useState(false);
   const [aiAgentAddress, setAiAgentAddress] = useState<Address | null>(null);
   const [userOpHash, setUserOpHash] = useState<Hex | null>(null);
   const [ownerEoaAddress, setOwnerEoaAddress] = useState<Address | null>(null);
-
-  // Store the raw private key in state
-  const [agentPrivateKey] = useState<Hex>(() => generatePrivateKey());
-  const [agentAccount] = useState<PrivateKeyAccount>(() => 
-    privateKeyToAccount(agentPrivateKey)
-  );
 
   useEffect(() => {
     const fetchOwnerAddress = async () => {
@@ -68,77 +51,48 @@ export default function UserInfo() {
     setTimeout(() => setIsCopied(false), 2000);
   };
 
-  // New function for permitting AI agent
   const onPermit = async () => {
     setIsPermitting(true);
     setUserOpHash(null);
 
-    const apiKey = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY;
-    if (!apiKey) {
-      throw new Error("NEXT_PUBLIC_ALCHEMY_API_KEY is not set");
-    }
-
-    if (!client || !client.account || !signer || !client.chain) {
-      console.error("Smart account client, account, signer, or chain not available.");
-      setIsPermitting(false);
-      return;
-    }
-
     try {
-      const modularClient = (client as AlchemySmartAccountClient<Chain, ModularAccountV2<AlchemySigner>>).extend(installValidationActions);
-      const agentSignerAddress = agentAccount.address;
-      setAiAgentAddress(agentSignerAddress);
+      if (!client || !client.account || !signer) {
+        throw new Error("Smart account client not ready");
+      }
 
-      const sessionKeyEntityId = 6;
-      const hookEntityId = 2;
-      const now = Math.floor(Date.now() / 1000);
-      const oneHour = 60 * 60;
-      const timeRangeInstallData = TimeRangeModule.encodeOnInstallData({
-        entityId: hookEntityId,
-        validAfter: now,
-        validUntil: now + oneHour,
+      // Get session config from backend
+      const configResponse = await fetch('/api/session-payload', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
 
+      if (!configResponse.ok) {
+        throw new Error('Failed to get session configuration');
+      }
+
+      const { agentAddress, ...payload } = await configResponse.json();
+      setAiAgentAddress(agentAddress);
+
+      // Use MAIN CLIENT (user's smart wallet) to install validation
+      const modularClient = (client as AlchemySmartAccountClient<Chain, ModularAccountV2<AlchemySigner>>).extend(installValidationActions);
+      
+      // Execute with user's smart wallet as signer
       const result = await modularClient.installValidation({
-        validationConfig: {
-          moduleAddress: getDefaultSingleSignerValidationModuleAddress(
-            modularClient.chain
-          ),
-          entityId: sessionKeyEntityId,
-          isGlobal: false,
-          isSignatureValidation: false,
-          isUserOpValidation: true,
-        },
-        selectors: [
-          toFunctionSelector(getAbiItem({ abi: semiModularAccountBytecodeAbi, name: "execute" })),
-          toFunctionSelector(getAbiItem({ abi: semiModularAccountBytecodeAbi, name: "executeBatch" })),
-        ],
-        installData: SingleSignerValidationModule.encodeOnInstallData({
-          entityId: sessionKeyEntityId,
-          signer: agentSignerAddress,
-        }),
-        hooks: [
-          {
-            hookConfig: {
-              address: getDefaultTimeRangeModuleAddress(modularClient.chain),
-              entityId: hookEntityId,
-              hookType: HookType.VALIDATION,
-              hasPreHooks: true,
-              hasPostHooks: false,
-            },
-            initData: timeRangeInstallData,
-          },
-        ],
+        ...payload,
+        installData: payload.installData,
       });
 
       setUserOpHash(result.hash);
-
+      
+      // Store only the agent reference - private key remains server-side
+      localStorage.setItem("aiAgentAddress", agentAddress);
+      
       await modularClient.waitForUserOperationTransaction(result);
 
-      localStorage.setItem("aiAgentPrivateKey", agentPrivateKey);
-      localStorage.setItem("sessionKeyEntityId", String(sessionKeyEntityId));
     } catch (e) {
-      console.error("Failed to permit agent:", e);
+      console.error("Agent permission error:", e);
     } finally {
       setIsPermitting(false);
     }
