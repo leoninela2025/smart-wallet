@@ -17,18 +17,27 @@ import {
 } from "@/components/ui/tooltip";
 import { formatAddress } from "@/lib/utils";
 import { useUser, useSmartAccountClient, useSigner } from "@account-kit/react";
-import { installValidationActions } from "@account-kit/smart-contracts/experimental";
+import { 
+  getDefaultSingleSignerValidationModuleAddress, 
+  getDefaultTimeRangeModuleAddress, 
+  installValidationActions, 
+  TimeRangeModule, 
+  HookType,
+  semiModularAccountBytecodeAbi,
+  SingleSignerValidationModule
+} from "@account-kit/smart-contracts/experimental";
 import { type ModularAccountV2 } from "@account-kit/smart-contracts";
 import { baseSepolia, type AlchemySmartAccountClient } from "@account-kit/infra";
-import { type Address, type Hex, type Chain } from "viem";
+import { type Address, type Hex, type Chain, toFunctionSelector, getAbiItem } from "viem";
 import { Spinner } from "./spinner";
-import { type AlchemySigner } from "@account-kit/core";
+import { SmartAccountSigner } from "@aa-sdk/core";
+import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 
 export default function UserInfo() {
   const [isCopied, setIsCopied] = useState(false);
   const user = useUser();
   const userEmail = user?.email ?? "anon";
-  const { client } = useSmartAccountClient({});
+  const { client, address } = useSmartAccountClient({});
   const signer = useSigner();
 
   const [isPermitting, setIsPermitting] = useState(false);
@@ -46,7 +55,7 @@ export default function UserInfo() {
   }, [signer]);
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(client?.account?.address ?? "");
+    navigator.clipboard.writeText(address ?? "");
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
   };
@@ -55,42 +64,42 @@ export default function UserInfo() {
     setIsPermitting(true);
     setUserOpHash(null);
 
-    try {
-      if (!client || !client.account || !signer) {
-        throw new Error("Smart account client not ready");
-      }
+    if (!client || !address || !signer) {
+      throw new Error("Smart account client not ready");
+    }
 
-      // Get session config from backend
-      const configResponse = await fetch('/api/session-payload', {
+    try {
+      // Call API endpoint to get session key creation payload
+      const response = await fetch('/api/session-key/create', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-        },
+        }
       });
 
-      if (!configResponse.ok) {
-        throw new Error('Failed to get session configuration');
+      if (!response.ok) throw new Error('Failed to create session key');
+      
+      const data = await response.json();
+      // Use API response to install validation
+      try {
+        const modularClient = (client as unknown as AlchemySmartAccountClient<Chain, ModularAccountV2<SmartAccountSigner>>).extend(installValidationActions);
+        const result = await modularClient.installValidation(data.installParams);
+        await modularClient.waitForUserOperationTransaction(result);
+        setUserOpHash(result.hash);
+        setAiAgentAddress(data.sessionKeyAddress);
+      } catch (e) {
+        // Clean up session key record if validation failed
+        if (data.installParams?.id) {
+          try {
+            await fetch(`/api/session-key/delete/${data.installParams.id}`, {
+              method: 'DELETE',
+            });
+          } catch (deleteError) {
+            console.error("Failed to delete session key record:", deleteError);
+          }
+        }
+        console.error("Agent permission error:", e);
       }
-
-      const { agentAddress, ...payload } = await configResponse.json();
-      setAiAgentAddress(agentAddress);
-
-      // Use MAIN CLIENT (user's smart wallet) to install validation
-      const modularClient = (client as AlchemySmartAccountClient<Chain, ModularAccountV2<AlchemySigner>>).extend(installValidationActions);
-      
-      // Execute with user's smart wallet as signer
-      const result = await modularClient.installValidation({
-        ...payload,
-        installData: payload.installData,
-      });
-
-      setUserOpHash(result.hash);
-      
-      // Store only the agent reference - private key remains server-side
-      localStorage.setItem("aiAgentAddress", agentAddress);
-      
-      await modularClient.waitForUserOperationTransaction(result);
-
     } catch (e) {
       console.error("Agent permission error:", e);
     } finally {
@@ -127,7 +136,7 @@ export default function UserInfo() {
           </div>
           <div className="flex items-center gap-2">
             <Badge variant="outline" className="font-mono text-xs py-1 px-2">
-              {formatAddress(client?.account?.address ?? "")}
+              {formatAddress(address ?? "")}
             </Badge>
             <TooltipProvider>
               <Tooltip open={isCopied}>
@@ -151,10 +160,9 @@ export default function UserInfo() {
               size="icon"
               className="h-6 w-6"
               onClick={() => {
-                const address = client?.account?.address;
-                if (address && client?.chain?.blockExplorers?.default?.url) {
+                if (address && baseSepolia.blockExplorers?.default?.url) {
                   window.open(
-                    `${client.chain.blockExplorers.default.url}/address/${address}`,
+                    `${baseSepolia.blockExplorers.default.url}/address/${address}`,
                     "_blank"
                   );
                 }
@@ -203,7 +211,7 @@ export default function UserInfo() {
             </div>
           )}
           <br />
-          <Button onClick={onPermit} disabled={isPermitting || !client?.account?.address}>
+          <Button onClick={onPermit} disabled={isPermitting || !address}>
             {isPermitting ? (
               <div className="flex items-center gap-2">
                 <Spinner /> Submitting...

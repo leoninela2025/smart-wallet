@@ -18,7 +18,7 @@ export default function Home() {
             // <div className="grid gap-8 md:grid-cols-[1fr_2fr]">
               <div className="flex flex-col gap-8">
                 <UserInfoCard />
-                <UsdcTransferCard />
+                {/* <UsdcTransferCard /> */}
               </div>
             // </div>
           ) : (
