@@ -45,6 +45,40 @@ export default function UserInfo() {
     fetchOwnerAddress();
   }, [signer]);
 
+  useEffect(() => {
+    const checkExistingSession = async () => {
+      const sessionId = localStorage.getItem('currentSessionId');
+      const expiration = localStorage.getItem('currentSessionExpiration');
+
+      console.log('Session check started', { sessionId, expiration });
+
+      if (sessionId && expiration) {
+        try {
+          console.log('Attempting to fetch session', sessionId);
+          const response = await fetch(`/api/sessions/${sessionId}`);
+          console.log('Session check response status:', response.status);
+          
+          const data = await response.json();
+          console.log('Session check response data:', data);
+
+          if (response.ok) {
+            setAiAgentAddress(data.sessionKeyAddress);
+          } else {
+            console.warn('Session validation failed, clearing storage');
+            localStorage.removeItem('currentSessionId');
+            localStorage.removeItem('currentSessionExpiration');
+          }
+        } catch (error) {
+          console.error('Session check failed:', error);
+          localStorage.removeItem('currentSessionId');
+          localStorage.removeItem('currentSessionExpiration');
+        }
+      }
+    };
+    
+    checkExistingSession();
+  }, [signer]);
+
   const handleCopy = () => {
     navigator.clipboard.writeText(address ?? "");
     setIsCopied(true);
@@ -61,7 +95,7 @@ export default function UserInfo() {
 
     try {
       // Call API endpoint to get session key creation payload
-      const response = await fetch('/api/session-key/create', {
+      const response = await fetch('/api/sessions/create', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -78,11 +112,13 @@ export default function UserInfo() {
         await modularClient.waitForUserOperationTransaction(result);
         setUserOpHash(result.hash);
         setAiAgentAddress(data.sessionKeyAddress);
+        localStorage.setItem('currentSessionId', data.currentSessionId);
+        localStorage.setItem('currentSessionExpiration', data.expiration.toString());
       } catch (e) {
         // Clean up session key record if validation failed
         if (data.installParams?.id) {
           try {
-            await fetch(`/api/session-key/delete/${data.installParams.id}`, {
+            await fetch(`/api/sessions/delete/${data.installParams.id}`, {
               method: 'DELETE',
             });
           } catch (deleteError) {
@@ -246,7 +282,7 @@ export default function UserInfo() {
                   </Button>
                 </div>
                 {!isPermitting && (
-                  <p className="mt-1 text-green-600">Success! Session Key registered.</p>
+                  <p className="mt-1 text-green-600">Success! Session key registered.</p>
                 )}
                 {isPermitting && (
                   <p className="mt-1">Waiting for the transaction to be mined...</p>
@@ -268,26 +304,3 @@ export default function UserInfo() {
     </Card>
   );
 }
-
-// InfoRow component - moved from permit-agent-card.tsx
-const InfoRow = ({
-  label,
-  value,
-  link,
-}: {
-  label: string;
-  value: string;
-  link: string;
-}) => (
-  <div className="text-sm">
-    <p className="font-semibold">{label}:</p>
-    <a
-      href={link}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="break-words text-blue-500 hover:underline"
-    >
-      {value}
-    </a>
-  </div>
-);

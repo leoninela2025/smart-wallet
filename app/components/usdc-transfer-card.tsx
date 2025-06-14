@@ -26,7 +26,7 @@ export default function UsdcTransferCard() {
   const [txUrl, setTxUrl]       = useState<string>();
   const [amount, setAmount]     = useState<number>();
   const [recipient, setRecip]   = useState<Address>();
-  const { client }              = useSmartAccountClient({});
+  const { client, address }              = useSmartAccountClient({});
 
   useEffect(() => {
     const regex = /([\d.]+)\s*usdc.*(0x[a-fA-F0-9]{40})/i;
@@ -37,81 +37,38 @@ export default function UsdcTransferCard() {
     }
   }, [instruction]);
 
-  const sessionKeyClient = useMemo(async () => {
-    const pk = localStorage.getItem("aiAgentPrivateKey") as Hex | null;
-    const ent = Number(localStorage.getItem("sessionKeyEntityId") ?? 1);
-    if (!pk || !client || !client.account) return;
-    return createModularAccountV2Client({
-      chain: client.chain ?? baseSepolia, // Provide fallback chain
-      transport: alchemy({ 
-        apiKey: process.env.NEXT_PUBLIC_ALCHEMY_API_KEY ?? "default_key"
-      }),
-      signer: new LocalAccountSigner(privateKeyToAccount(pk)),
-      signerEntity: { entityId: ent, isGlobalValidation: false },
-      accountAddress: client.account.address,
-      mode: "default",
-      policyId: process.env.NEXT_PUBLIC_ALCHEMY_POLICY_ID ?? "default_policy",
-    });
-  }, [client]);
-
   const handleSend = async () => {
-    const client = await sessionKeyClient;
-    console.log('Client:', client);
-    console.log('Client Signer:', client?.account.getSigner());
-    if (!client || !amount || !recipient) {
-      setError("Unable to parse instruction or missing key");
+    if (!address || !amount || !recipient) {
+      setError("Missing required parameters");
       return;
     }
+
     setIsSending(true);
     setError(undefined);
-    let uoHash: Hex | undefined;
     
     try {
-      const result = await client.sendUserOperation({
-        uo: {
-          target: USDC_CONTRACT_ADDRESS,
-          data: encodeFunctionData({
-            abi: USDC_ABI,
-            functionName: "transfer",
-            args: [recipient, BigInt(Math.floor(amount * 1e6))],
-          }),
+      const response = await fetch('/api/sessions/transfer', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          accountAddress: address,
+          sessionId: localStorage.getItem('currentSessionId'), // Retrieve from storage
+          amount,
+          recipient
+        }),
       });
-      
-      uoHash = result.hash;
-      
-      // console.log('Client:', client);
-      console.log('UserOperation Hash:', uoHash);      
-      // Add manual checking as fallback
-      let tx: Hex | undefined;
-      const startTime = Date.now();
-      while (!tx && Date.now() - startTime < 180_000) { // 3 minute timeout
-        try {
-          tx = await client.waitForUserOperationTransaction({ hash: uoHash });
-        } catch (e) {
-          if (!(e instanceof Error) || !e.message.includes("not found")) throw e;
-          await new Promise(resolve => setTimeout(resolve, 5000));
-        }
+
+      if (!response.ok) {
+        throw new Error('Transfer failed');
       }
 
-      if (!tx) {
-        throw new Error(`
-          Transaction not found after 3 minutes. Check bundler status:
-          - OP Hash: ${uoHash}
-          - Bundler: ${client.chain.rpcUrls.alchemy.http[0]}
-          - Explorer: ${client.chain.blockExplorers?.default.url}/tx/${uoHash}
-        `);
-      }
-
-      setTxUrl(`${client.chain.blockExplorers!.default.url}/tx/${tx}`);
+      const data = await response.json();
+      setTxUrl(`${baseSepolia.blockExplorers?.default.url}/tx/${data.transactionHash}`);
     } catch (e: any) {
-      setError(e.message.replace(/\[.*?\]/g, '')); // Clean up error message
-      console.error('Full error details:', {
-        error: e,
-        uoHash,
-        clientConfig: client?.chain,
-        paymaster: client?.paymaster
-      });
+      setError(e.message.replace(/\[.*?\]/g, ''));
+      console.error('Transfer error:', e);
     } finally {
       setIsSending(false);
     }

@@ -17,9 +17,11 @@ import { v4 as uuidv4 } from 'uuid';
 // Add type definition at the top
 type SessionKeyData = {
   id: string;
+  address: string;
   privateKey: string;
   sessionEntityId: number;
   hookEntityId: number;
+  expiration: number;
 };
 
 // Session key creation with permissions
@@ -46,21 +48,25 @@ export async function POST(_request: Request) {
 
     // Persist session key metadata
     const filePath = path.join(process.cwd(), 'session-keys.json');
-    let sessionKeys: Record<string, SessionKeyData> = {};
+    let sessionKeys: SessionKeyData[] = []; // Changed from object to array
     
     try {
       const data = await fs.readFile(filePath, 'utf-8');
-      sessionKeys = JSON.parse(data) as Record<string, SessionKeyData>;
+      sessionKeys = JSON.parse(data) as SessionKeyData[];
     } catch (error) {
-      // File doesn't exist, start with empty object
+      // File doesn't exist, start with empty array
     }
 
-    sessionKeys[agentAccount.address] = {
-      id: uuidv4(),
+    // Add new entry to array instead of object key
+    const sessionId = uuidv4();
+    sessionKeys.push({
+      id: sessionId,
+      address: agentAccount.address,
       privateKey: agentPrivateKey,
       sessionEntityId: sessionKeyEntityId,
       hookEntityId: hookEntityId,
-    };
+      expiration: validUntil,
+    });
 
     await fs.writeFile(filePath, JSON.stringify(sessionKeys, null, 2));
 
@@ -98,6 +104,8 @@ export async function POST(_request: Request) {
       {
         sessionKeyAddress: agentAccount.address,
         installParams: installParams,
+        currentSessionId: sessionId,
+        expiration: validUntil,
       }
     );
   } catch (error) {
