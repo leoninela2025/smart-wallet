@@ -17,21 +17,12 @@ import {
 } from "@/components/ui/tooltip";
 import { formatAddress } from "@/lib/utils";
 import { useUser, useSmartAccountClient, useSigner } from "@account-kit/react";
-import { 
-  getDefaultSingleSignerValidationModuleAddress, 
-  getDefaultTimeRangeModuleAddress, 
-  installValidationActions, 
-  TimeRangeModule, 
-  HookType,
-  semiModularAccountBytecodeAbi,
-  SingleSignerValidationModule
-} from "@account-kit/smart-contracts/experimental";
+import { installValidationActions} from "@account-kit/smart-contracts/experimental";
 import { type ModularAccountV2 } from "@account-kit/smart-contracts";
 import { baseSepolia, type AlchemySmartAccountClient } from "@account-kit/infra";
-import { type Address, type Hex, type Chain, toFunctionSelector, getAbiItem } from "viem";
+import { type Address, type Hex, type Chain } from "viem";
 import { Spinner } from "./spinner";
 import { SmartAccountSigner } from "@aa-sdk/core";
-import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 
 export default function UserInfo() {
   const [isCopied, setIsCopied] = useState(false);
@@ -173,54 +164,106 @@ export default function UserInfo() {
           </div>
         </div>
 
-        {/* New section for permitting AI Agent */}
-        <div className="pt-4 border-t mt-4">
-          <h3 className="text-lg font-semibold mb-2">Permit AI Agent</h3>
-          <p className="text-sm text-muted-foreground mb-4">
-            Authorize an AI agent with a one-hour session key for your existing smart account.
-          </p>
-          {ownerEoaAddress && (
-            <InfoRow
-              label="Owner EOA Address"
-              value={ownerEoaAddress}
-              link={getExplorerLink(ownerEoaAddress)}
-            />
-          )}
-          {aiAgentAddress && (
-            <InfoRow
-              label="AI Agent Address"
-              value={aiAgentAddress}
-              link={getExplorerLink(aiAgentAddress)}
-            />
-          )}
-          {userOpHash && (
-            <div>
-              <InfoRow
-                label="UserOp Hash"
-                value={userOpHash}
-                link={getUserOpLink(userOpHash)}
-              />
-              {!isPermitting && (
-                <p className="mt-1 text-green-600">
-                  Success! Session Key registered.
+        {/* Create Session Key Section */}
+        <Card className="mt-4">
+          <CardHeader>
+            <CardTitle>Create an AI Session</CardTitle>
+            <CardDescription>
+              Authorize an AI agent with a one-hour session key for your existing smart account.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {aiAgentAddress && (
+              <div>
+                <p className="text-sm font-medium text-muted-foreground mb-1">
+                  AI Agent Address
                 </p>
-              )}
-              {isPermitting && (
-                <p className="mt-1">Waiting for the transaction to be mined...</p>
-              )}
-            </div>
-          )}
-          <br />
-          <Button onClick={onPermit} disabled={isPermitting || !address}>
-            {isPermitting ? (
-              <div className="flex items-center gap-2">
-                <Spinner /> Submitting...
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="font-mono text-xs py-1 px-2">
+                    {formatAddress(aiAgentAddress)}
+                  </Badge>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => navigator.clipboard.writeText(aiAgentAddress)}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Copy Address</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={() => window.open(getExplorerLink(aiAgentAddress), "_blank")}
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               </div>
-            ) : (
-              "Permit AI Agent"
             )}
-          </Button>
-        </div>
+            {userOpHash && (
+              <div>
+                <p className="text-sm font-medium text-muted-foreground mb-1">
+                  UserOp Hash
+                </p>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="font-mono text-xs py-1 px-2">
+                    {formatAddress(userOpHash)}
+                  </Badge>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => navigator.clipboard.writeText(userOpHash)}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Copy Hash</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={() => window.open(getUserOpLink(userOpHash), "_blank")}
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+                {!isPermitting && (
+                  <p className="mt-1 text-green-600">Success! Session Key registered.</p>
+                )}
+                {isPermitting && (
+                  <p className="mt-1">Waiting for the transaction to be mined...</p>
+                )}
+              </div>
+            )}
+            <Button onClick={onPermit} disabled={isPermitting || !address}>
+              {isPermitting ? (
+                <div className="flex items-center gap-2">
+                  <Spinner /> Creating Session Key...
+                </div>
+              ) : (
+                "Create New Session"
+              )}
+            </Button>
+          </CardContent>
+        </Card>
       </CardContent>
     </Card>
   );
