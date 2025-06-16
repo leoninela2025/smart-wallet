@@ -1,13 +1,9 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Bot, CheckCircle, ExternalLink, Loader2 } from "lucide-react";
 import { useSmartAccountClient } from "@account-kit/react";
-import { encodeFunctionData, type Address, type Hex } from "viem";
-import { LocalAccountSigner } from "@aa-sdk/core";
-import { privateKeyToAccount } from "viem/accounts";
-import { createModularAccountV2Client } from "@account-kit/smart-contracts";
-import { alchemy, baseSepolia } from "@account-kit/infra";
-import { USDC_ABI, USDC_CONTRACT_ADDRESS } from "@/lib/constants";
+import { type Address } from "viem";
+import { baseSepolia } from "@account-kit/infra";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
