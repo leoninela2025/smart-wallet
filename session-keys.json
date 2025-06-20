@@ -169,5 +169,13 @@
     "sessionEntityId": 2877620764,
     "hookEntityId": 1,
     "expiration": 1750428576
+  },
+  {
+    "id": "40492e14-5709-4366-bc77-ecc48c9de8b8",
+    "address": "0x1B0a454Ad24f8d5E04873cdA9cBa18bEfc718b12",
+    "privateKey": "0xc22c878eb88660ef4182f8a2a697cc7c456a1a36a2403d5c49bd2e3c4b6d16f3",
+    "sessionEntityId": 2327570018,
+    "hookEntityId": 1,
+    "expiration": 1750438362
   }
 ]

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { ExternalLink, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,10 +19,25 @@ import { formatAddress } from "@/lib/utils";
 import { useUser, useSmartAccountClient, useSigner } from "@account-kit/react";
 import { installValidationActions} from "@account-kit/smart-contracts/experimental";
 import { type ModularAccountV2 } from "@account-kit/smart-contracts";
-import { baseSepolia, type AlchemySmartAccountClient } from "@account-kit/infra";
-import { type Address, type Hex, type Chain } from "viem";
+import {
+  baseSepolia,
+  type AlchemySmartAccountClient,
+} from "@account-kit/infra";
+import {
+  type Address,
+  type Hex,
+  type Chain,
+  createWalletClient,
+  custom,
+  erc20Abi,
+  parseUnits,
+  formatUnits,
+} from "viem";
 import { Spinner } from "./spinner";
 import { SmartAccountSigner } from "@aa-sdk/core";
+import { USDC_CONTRACT_ADDRESS } from "@/lib/constants";
+
+const USDC_DECIMALS = 6;
 
 export default function UserInfo() {
   const [isCopied, setIsCopied] = useState(false);
@@ -31,10 +46,31 @@ export default function UserInfo() {
   const { client, address } = useSmartAccountClient({});
   const signer = useSigner();
 
+  const [balance, setBalance] = useState<string | null>(null);
   const [isPermitting, setIsPermitting] = useState(false);
+  const [isFunding, setIsFunding] = useState(false);
+  const [fundingTxHash, setFundingTxHash] = useState<Hex | null>(null);
   const [aiAgentAddress, setAiAgentAddress] = useState<Address | null>(null);
   const [userOpHash, setUserOpHash] = useState<Hex | null>(null);
   const [ownerEoaAddress, setOwnerEoaAddress] = useState<Address | null>(null);
+
+  const fetchBalance = useCallback(async () => {
+    if (!client || !address) {
+      return;
+    }
+    try {
+      const balance = await client.readContract({
+        address: USDC_CONTRACT_ADDRESS,
+        abi: erc20Abi,
+        functionName: "balanceOf",
+        args: [address],
+      });
+      setBalance(formatUnits(balance, USDC_DECIMALS));
+    } catch (e) {
+      console.error("Error fetching balance: ", e);
+      setBalance(null);
+    }
+  }, [client, address]);
 
   useEffect(() => {
     const fetchOwnerAddress = async () => {
@@ -44,6 +80,17 @@ export default function UserInfo() {
     };
     fetchOwnerAddress();
   }, [signer]);
+
+  useEffect(() => {
+    if (address && client) {
+      fetchBalance();
+      const intervalId = setInterval(fetchBalance, 5000); // Poll every 5 seconds
+
+      return () => {
+        clearInterval(intervalId);
+      };
+    }
+  }, [address, client, fetchBalance]);
 
   useEffect(() => {
     const checkExistingSession = async () => {
@@ -114,6 +161,7 @@ export default function UserInfo() {
         setAiAgentAddress(data.sessionKeyAddress);
         localStorage.setItem('currentSessionId', data.currentSessionId);
         localStorage.setItem('currentSessionExpiration', data.expiration.toString());
+        await fetchBalance();
       } catch (e) {
         // Clean up session key record if validation failed
         if (data.installParams?.id) {
@@ -131,6 +179,41 @@ export default function UserInfo() {
       console.error("Agent permission error:", e);
     } finally {
       setIsPermitting(false);
+    }
+  };
+
+  const onFundWallet = async () => {
+    if (!address) return;
+
+    setIsFunding(true);
+    setFundingTxHash(null);
+    try {
+      const response = await fetch("/api/fund-wallet", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ recipient: address }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to fund wallet");
+      }
+
+      const data = await response.json();
+      setFundingTxHash(data.txHash);
+
+      if (client && data.txHash) {
+        await client.waitForTransactionReceipt({ hash: data.txHash });
+      }
+
+      await fetchBalance();
+    } catch (error) {
+      console.error("Funding error:", error);
+      alert((error as Error).message);
+    } finally {
+      setIsFunding(false);
     }
   };
 
@@ -199,6 +282,71 @@ export default function UserInfo() {
             </Button>
           </div>
         </div>
+
+        {address && (
+          <div>
+            <p className="text-sm font-medium text-muted-foreground mb-1">
+              Balance
+            </p>
+            {balance !== null ? (
+              <p className="font-medium text-xl">{balance} USDC</p>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Spinner /> Loading...
+              </div>
+            )}
+          </div>
+        )}
+
+        {address && (
+          <Card className="mt-4">
+            <CardHeader>
+              <CardTitle>Fund Your Wallet</CardTitle>
+              <CardDescription>
+                Fund your smart wallet with some USDC.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button onClick={onFundWallet} disabled={isFunding || !address}>
+                {isFunding ? (
+                  <div className="flex items-center gap-2">
+                    <Spinner /> Funding...
+                  </div>
+                ) : (
+                  "Fund Wallet"
+                )}
+              </Button>
+              {fundingTxHash && (
+                <div className="mt-4">
+                  <p className="text-sm font-medium text-muted-foreground mb-1">
+                    Funding Transaction
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Badge
+                      variant="outline"
+                      className="font-mono text-xs py-1 px-2"
+                    >
+                      {formatAddress(fundingTxHash)}
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={() =>
+                        window.open(
+                          `${baseSepolia.blockExplorers?.default.url}/tx/${fundingTxHash}`,
+                          "_blank"
+                        )
+                      }
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Create Session Key Section */}
         <Card className="mt-4">
