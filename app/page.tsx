@@ -5,6 +5,7 @@ import UserInfoCard from "./components/user-info-card";
 import LoginCard from "./components/login-card";
 import Header from "./components/header";
 import UsdcTransferCard from "./components/usdc-transfer-card";
+import LogisticsChatbot from "./components/logistics-chatbot";
 
 export default function Home() {
   const signerStatus = useSignerStatus();
@@ -19,6 +20,7 @@ export default function Home() {
               <div className="flex flex-col gap-8">
                 <UserInfoCard />
                 <UsdcTransferCard />
+                <LogisticsChatbot/>
               </div>
             // </div>
           ) : (

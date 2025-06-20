@@ -44,7 +44,7 @@ export async function POST(request: Request) {
     const sessionKeyClient = await createModularAccountV2Client({
         chain: baseSepolia,
         transport: alchemy({
-            apiKey: process.env.NEXT_PUBLIC_ALCHEMY_API_KEY || "1eG70fLQ4E-XkhVxMmtYF",
+            apiKey: process.env.NEXT_PUBLIC_ALCHEMY_API_KEY || ""
         }),
         signer: sessionKeySigner,
         accountAddress: accountAddress,

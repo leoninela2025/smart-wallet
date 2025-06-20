@@ -29,6 +29,7 @@ export async function GET(
 
     return NextResponse.json({
       sessionKeyAddress: session.address,
+      sessionPrivateKey: session.privateKey,
       installParams: {
         validationConfig: {
           entityId: session.sessionEntityId
