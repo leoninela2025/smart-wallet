@@ -21,12 +21,15 @@ type SessionKeyData = {
   privateKey: string;
   sessionEntityId: number;
   hookEntityId: number;
+  smartWalletAddress: string;
   expiration: number;
 };
 
 // Session key creation with permissions
 export async function POST(_request: Request) {
   try {
+    const { smartWalletAddress } = await _request.json();
+
     const agentPrivateKey = generatePrivateKey();
     const agentAccount = privateKeyToAccount(agentPrivateKey);
     
@@ -65,6 +68,7 @@ export async function POST(_request: Request) {
       privateKey: agentPrivateKey,
       sessionEntityId: sessionKeyEntityId,
       hookEntityId: hookEntityId,
+      smartWalletAddress: smartWalletAddress,
       expiration: validUntil,
     });
 

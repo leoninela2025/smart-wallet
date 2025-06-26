@@ -1,0 +1,57 @@
+app.post("/logistics/quote/:laptopId/:useCase", async (c) => {
+  const serverIdentity = await getKeypairInfo(env(c).SERVER_PRIVATE_KEY_HEX)
+  const laptopId = c.req.param('laptopId')
+  const useCase = c.req.param('useCase')
+  console.log("Watch: " + laptopId )
+  if (!laptopId) {
+    return c.json(
+        {
+          error: 'Missing laptopId parameter.',
+        },
+        400 // Bad Request
+    );
+  }
+  const receipt = c.req.header("Authorization")?.replace("Bearer ", "")
+
+  if (receipt) {
+
+    const verifiedReceipt = await verifyServiceReceipt(receipt, LOGISTICS_PAYMENT_OPTION_ID, c)
+    if (verifiedReceipt) {
+      log(successMessage("Logistics receipt verified successfully"))
+      switch (useCase) {
+        case "reviews":
+          return c.json({ message: `Your rating and review quote is available: We've compiled reviews across multiple websites. Average rating: ${laptops[laptopId].rating} across ${laptops[laptopId].reviews}` })
+        case "availability":
+          return c.json({ message: `Your availability data has been fetched: ${laptops[laptopId].availability}` })
+
+      }
+    } else {
+      throw new HTTPException(400, { message: "Invalid or incorrect logistics receipt." })
+    }
+  } else {
+    log(colors.yellow("No logistics receipt found, generating payment request..."))
+    const paymentRequestInit = createServicePaymentRequest(
+        serverIdentity.did,
+        serverIdentity.crypto.address,
+        LOGISTICS_PAYMENT_OPTION_ID,
+        40000, // $0.04 USDC (6 decimals)
+        "USDC",
+        6,
+        chainId, // eip155:84532 (Base Sepolia)
+        RECEIPT_SERVICE_URL
+    )
+    const paymentRequest402Response = await createPaymentRequestResponse(
+        paymentRequestInit,
+        {
+          issuer: serverIdentity.did,
+          signer: serverIdentity.jwtSigner,
+          algorithm: serverIdentity.keypair.algorithm,
+        }
+    )
+    log(successMessage("Logistics payment request generated"))
+    const logisticsPaymentRequestJson = await paymentRequest402Response.clone().json();
+    logJson(logisticsPaymentRequestJson)
+    throw new HTTPException(402, { res: paymentRequest402Response })
+
+  }
+})
