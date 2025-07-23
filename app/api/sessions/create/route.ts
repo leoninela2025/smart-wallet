@@ -21,12 +21,15 @@ type SessionKeyData = {
   privateKey: string;
   sessionEntityId: number;
   hookEntityId: number;
+  smartWalletAddress: string;
   expiration: number;
 };
 
 // Session key creation with permissions
 export async function POST(_request: Request) {
   try {
+    const { smartWalletAddress } = await _request.json();
+
     const agentPrivateKey = generatePrivateKey();
     const agentAccount = privateKeyToAccount(agentPrivateKey);
     
@@ -65,6 +68,7 @@ export async function POST(_request: Request) {
       privateKey: agentPrivateKey,
       sessionEntityId: sessionKeyEntityId,
       hookEntityId: hookEntityId,
+      smartWalletAddress: smartWalletAddress,
       expiration: validUntil,
     });
 
@@ -115,58 +119,3 @@ export async function POST(_request: Request) {
     );
   }
 }
-
-// Session key revocation
-// export async function DELETE(request: Request) {
-//   const { sessionKeyEntityId, hookEntityId, agentAccount, accountAddress } = await request.json();
-
-//   const client = createAlchemySmartAccountClient({
-//     chain: baseSepolia,
-//     transport: alchemy({ apiKey: process.env.ALCHEMY_API_KEY || "" }),
-//     account: accountAddress,
-//   });
-
-//   const modularClient = (client as unknown as AlchemySmartAccountClient<Chain, ModularAccountV2<SmartAccountSigner>>).extend(installValidationActions);
-
-//   try {
-//     const result = await modularClient.uninstallValidation({
-//       moduleAddress: getDefaultSingleSignerValidationModuleAddress(modularClient.chain),
-//       entityId: sessionKeyEntityId,
-//       uninstallData: SingleSignerValidationModule.encodeOnUninstallData({
-//         entityId: sessionKeyEntityId,
-//       }),
-//       hookUninstallDatas: [
-//         TimeRangeModule.encodeOnUninstallData({
-//           entityId: hookEntityId
-//         }),
-//       ],
-//     });
-
-//     await modularClient.waitForUserOperationTransaction(result);
-
-//     // Remove from session keys file
-//     const filePath = path.join(process.cwd(), 'session-keys.json');
-//     let sessionKeys: Record<string, SessionKeyData> = {};
-    
-//     try {
-//       const data = await fs.readFile(filePath, 'utf-8');
-//       sessionKeys = JSON.parse(data) as Record<string, SessionKeyData>;
-//       delete sessionKeys[agentAccount.address];
-//       await fs.writeFile(filePath, JSON.stringify(sessionKeys, null, 2));
-//     } catch (error) {
-//       // File doesn't exist or other error, log but continue
-//       console.error('Error updating session keys file:', error);
-//     }
-
-//     return NextResponse.json({
-//       success: true,
-//       revokedKey: agentAccount.address,
-//       txHash: result.hash
-//     });
-//   } catch (error) {
-//     return NextResponse.json(
-//       { error: "Session key revocation failed", details: error },
-//       { status: 500 }
-//     );
-//   }
-// } 

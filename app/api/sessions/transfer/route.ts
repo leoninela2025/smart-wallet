@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createModularAccountV2Client } from "@account-kit/smart-contracts";
+import { alchemyFeeEstimator } from "@account-kit/infra";
 import { LocalAccountSigner } from "@aa-sdk/core";
 import { encodeFunctionData } from "viem";
 import { baseSepolia, alchemy } from "@account-kit/infra";
@@ -17,6 +18,7 @@ type SessionKeyData = {
   };
 
 export async function POST(request: Request) {
+
     const { accountAddress, sessionId, amount, recipient } = await request.json();
 
     if (!accountAddress || !sessionId || !amount || !recipient) {
@@ -54,6 +56,9 @@ export async function POST(request: Request) {
         },
         policyId: process.env.NEXT_PUBLIC_ALCHEMY_POLICY_ID ?? "default_policy",
     });
+
+
+
 
     try {
         const result = await sessionKeyClient.sendUserOperation({

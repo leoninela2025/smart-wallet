@@ -1,7 +1,7 @@
 import os
 import json
 import aiohttp
-from typing import Optional
+from typing import Optional, List
 from fastmcp import FastMCP
 from dotenv import load_dotenv
 import time
@@ -9,6 +9,7 @@ import time
 load_dotenv()
 # Initialize FastMCP server
 mcp = FastMCP(name="Logistics Server", version="1.0.0")
+from pprint import pprint
 
 # Configuration
 PAYMENT_SERVICE = os.getenv("PAYMENT_SERVICE")
@@ -20,30 +21,37 @@ def is_non_empty_string(value: Optional[str]) -> bool:
     """Check if a string is non-empty"""
     return value is not None and value.strip() != ""
 
-async def make_logistics_api_call(url: str, transactionHash: Optional[str] = None) -> str:
+async def make_logistics_api_call(url: str, receiptToken: Optional[str] = None, payload: Optional[dict] = None) -> str:
     """Make API call to logistics service"""
     try:
         headers = {"Content-Type": "application/json"}
         
-        if is_non_empty_string(transactionHash):
-            headers["X-Transaction-Hash"] = transactionHash
+        if is_non_empty_string(receiptToken):
+            headers["Authorization"] = f"Bearer {receiptToken}"
         
         async with aiohttp.ClientSession() as session:
-            async with session.post(url, headers=headers) as response:
+            async with session.post(url, headers=headers, json=payload) as response:
                 data = await response.json()
                 
-                if response.status == 402:
-                    payment_option = data["paymentRequest"]["paymentOptions"][0]
-                    return json.dumps({
-                        "status": 402,
-                        "message": f"Successfully called {url}",
-                        "recipient": payment_option["recipient"],
-                        "amount": payment_option["amount"] / (10 ** payment_option["decimals"]),
-                        "paymentOptionId": payment_option["id"],
-                        "paymentToken": data["paymentToken"]
-                    })
+            if response.status == 402:
+                payment_option = data["paymentRequest"]["paymentOptions"][0]
+                return json.dumps({
+                    "status": 402,
+                    "message": f"Successfully called {url}",
+                    "recipient": payment_option["recipient"],
+                    "amount": payment_option["amount"] / (10 ** payment_option["decimals"]),
+                    "paymentOptionId": payment_option["id"],
+                    "paymentToken": data["paymentToken"],
+                    "purpose": "x402 endpoint",
+                    "displayData": f"Hit a 402: Payment Required response when calling {url} ❗️"
+                })
+            else:
+                if response.status == 200:
+                    data["displayData"] = f"Successfully called the utility with receipt token"
+                    data["purpose"] = "x402 endpoint"
                 else:
-                    return json.dumps(data)
+                    data["displayData"] = f"Issue encountered when calling utility endpoint."
+                return json.dumps(data)
                     
     except Exception as error:
         return json.dumps({
@@ -52,36 +60,17 @@ async def make_logistics_api_call(url: str, transactionHash: Optional[str] = Non
         })
 
 
-@mcp.tool
-async def get_delivery_estimate(watch_id: int, transactionHash: Optional[str] = None) -> str:
-    """Provides a delivery estimate for the given watch ID.
-    
-    Args:
-        watch_id: The watch ID to get delivery estimate for
-        transactionHash: The on chain transaction hash for verification
-    
-    Returns:
-        JSON string with delivery estimate information
-    """
-    if not PAYMENT_SERVICE:
-        return json.dumps({
-            "error": "Payment service not configured",
-            "details": "PAYMENT_SERVICE environment variable is not set"
-        })
-    
-    url = f"{PAYMENT_SERVICE}/logistics/quote/{watch_id}"
-    return await make_logistics_api_call(url, transactionHash)
 
 @mcp.tool
-async def get_warranty_check(watch_id: int, transactionHash: Optional[str] = None) -> str:
-    """Provides a warranty check for the given watch ID.
+async def get_reviews(laptop_ids: List[str], receiptToken: Optional[str] = None) -> str:
+    """Fetches information related to reviews and ratings for given laptop ids
     
     Args:
-        watch_id: The watch ID to check warranty for
-        transactionHash: The on chain transaction hash for verification
+        laptop_ids: A list of laptop IDs to get ratings and reviews for
+        receiptToken: The receipt token for verification
     
     Returns:
-        JSON string with warranty check information
+        JSON string with rating and review information
     """
     if not PAYMENT_SERVICE:
         return json.dumps({
@@ -89,13 +78,21 @@ async def get_warranty_check(watch_id: int, transactionHash: Optional[str] = Non
             "details": "PAYMENT_SERVICE environment variable is not set"
         })
     
-    url = f"{PAYMENT_SERVICE}/warranty/check/{watch_id}"
-    return await make_logistics_api_call(url, transactionHash)
+    url = f"{PAYMENT_SERVICE}/logistics/reviews"
+    payload = {"laptopIds": laptop_ids} # Pass laptop_ids in the request body
+    return await make_logistics_api_call(url, receiptToken, payload)
+
 
 @mcp.tool
-async def get_watches():
-    """
-    Returns a list of all watches available in inventory
+async def get_availability(laptop_ids: List[str], receiptToken: Optional[str] = None) -> str:
+    """Fetches information related to availability for given laptop ids
+    
+    Args:
+        laptop_ids: A list of laptop IDs to get availability for
+        receiptToken: The receipt token for verification
+    
+    Returns:
+        JSON string with availability information
     """
     if not PAYMENT_SERVICE:
         return json.dumps({
@@ -103,11 +100,88 @@ async def get_watches():
             "details": "PAYMENT_SERVICE environment variable is not set"
         })
     
-    url = f"{PAYMENT_SERVICE}/get-watches"
+    url = f"{PAYMENT_SERVICE}/logistics/availability"
+    payload = {"laptopIds": laptop_ids} # Pass laptop_ids in the request body
+    return await make_logistics_api_call(url, receiptToken, payload)
+
+@mcp.tool
+async def get_laptops():
+    """
+    Returns a list of all laptops available in inventory with images
+    """
+    if not PAYMENT_SERVICE:
+        return json.dumps({
+            "error": "Payment service not configured",
+            "details": "PAYMENT_SERVICE environment variable is not set"
+        })
+    
+    url = f"{PAYMENT_SERVICE}/get-laptops"
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(url) as response:
                 data = await response.json()
+                data["images"] = True
+                # Ensure each laptop has an image URL
+                for laptop in data["items"]:
+                    if 'image' not in laptop or not laptop['image']:
+                        # Add placeholder image if no image is provided
+                        laptop['image'] = f"/{laptop["id"]}.png"
+                data["purpose"] = "get-all for inventory"
+                return json.dumps(data)
+    except Exception as error:
+        return json.dumps({
+            "error": "Internal server error",
+            "details": str(error)
+        })
+    
+
+@mcp.tool
+async def get_laptop(laptopId):
+    """
+    Returns the laptop with the given laptop id available in inventory with its image
+    """
+    if not PAYMENT_SERVICE:
+        return json.dumps({
+            "error": "Payment service not configured",
+            "details": "PAYMENT_SERVICE environment variable is not set"
+        })
+    
+    url = f"{PAYMENT_SERVICE}/get-laptops/{laptopId}"
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                data = await response.json()
+                data["images"] = True
+                # Ensure each laptop has an image URL
+                for laptop in data["items"]:
+                    if 'image' not in laptop or not laptop['image']:
+                        # Add placeholder image if no image is provided
+                        laptop['image'] = f"/{laptop["id"]}.png"
+                data["purpose"] = "viewing a specific product"
+                return json.dumps(data)
+    except Exception as error:
+        return json.dumps({
+            "error": "Internal server error",
+            "details": str(error)
+        })
+    
+@mcp.tool
+async def purchase_laptop(laptopId):
+    """
+    Fulfils the request of buying a laptop
+    """
+    if not PAYMENT_SERVICE:
+        return json.dumps({
+            "error": "Payment service not configured",
+            "details": "PAYMENT_SERVICE environment variable is not set"
+        })
+    
+    url = f"{PAYMENT_SERVICE}/get-laptops/{laptopId}"
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                data = await response.json()
+                data["purpose"] = "making a purchase"
                 return json.dumps(data)
     except Exception as error:
         return json.dumps({
@@ -129,9 +203,6 @@ async def getSessionData(sessionId):
             "details": str(error)
         })
 
-
-
-
 @mcp.tool
 async def make_payment(paymentOptionId: str, senderAddress: str, sessionId: str, recipientAddress: str, amount: float) -> str:
     """
@@ -151,8 +222,12 @@ async def make_payment(paymentOptionId: str, senderAddress: str, sessionId: str,
             }
         async with aiohttp.ClientSession() as session:
             async with session.post(url, json=reqData) as response:
-                data = await response.json() 
+                data = await response.json()
+                time.sleep(3) 
                 data["paymentOptionId"] = paymentOptionId
+                data["purpose"] = f"{data["transactionHash"]}"
+
+                data["displayData"] = f"Made a payment for {amount} USDC to merchant with address: {recipientAddress}"
                 return json.dumps(data)
                     
     except Exception as error:
@@ -161,18 +236,18 @@ async def make_payment(paymentOptionId: str, senderAddress: str, sessionId: str,
             "details": str(error)
         })
 
-
-
 @mcp.tool
 async def get_receipt(sessionId, paymentToken, transactionHash, paymentOptionId) -> str:
-    """Provides a warranty check for the given watch ID.
+    """Gets the receipt for verification of an on chain transaction.
     
     Args:
-        watch_id: The watch ID to check warranty for
-        receipt_token: Optional receipt token for verification
+        sessionId: The current session id of agent
+        paymentToken: jwt token for payment to get receipt for
+        transactionHash: the transaction hash of on chain payment
+        paymentOptionId: the payment option id use case for the transaction. 
     
     Returns:
-        JSON string with warranty check information
+        JSON string with receipt information
     """
     if not PAYMENT_SERVICE:
         return json.dumps({
@@ -183,13 +258,17 @@ async def get_receipt(sessionId, paymentToken, transactionHash, paymentOptionId)
     url = f"{PAYMENT_SERVICE}/get-receipt"
     try:
         reqData = data = {
-                "paymentToken": paymentToken, "settlementTxnHash": transactionHash, "clientPrivateKey": sessionData["sessionPrivateKey"], "paymentOptionId": paymentOptionId
+                "paymentToken": paymentToken, "settlementTxnHash": transactionHash, "clientPrivateKey": sessionData["sessionPrivateKey"], "paymentOptionId": paymentOptionId, "smartWalletAddress": sessionData["smartWalletAddress"]
             }
-        print(reqData)
         async with aiohttp.ClientSession() as session:
             async with session.post(url, json=reqData) as response:
                 data = await response.json()
-                return json.dumps(data)
+                ret = {"receipt": data["receipt"]}
+                print(ret)
+                ret["purpose"] = "Verification service endpoint"
+                ret["displayData"] = f"Obtained a receipt for the transaction: {transactionHash}, receipt token: {data["receipt"][:15]}..."
+
+                return json.dumps(ret)
             
                     
     except Exception as error:
@@ -197,6 +276,8 @@ async def get_receipt(sessionId, paymentToken, transactionHash, paymentOptionId)
             "error": "Internal server error",
             "details": str(error)
         })
+    
+
 
 if __name__ == "__main__":
     print("Starting Logistics MCP Server...")

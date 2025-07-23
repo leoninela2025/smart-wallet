@@ -13,10 +13,10 @@ import { cn } from "@/lib/utils";
 // This is a hardcoded address for demo purposes.
 // In a real app, this would be dynamic.
 const RECIPIENT_ADDRESS = "0x531d45E22D24bdACbB23C5004A1C64588B1E7f26";
-const USDC_AMOUNT = 0.03;
+const USDC_AMOUNT = 30000;
 
 export default function UsdcTransferCard() {
-  const [instruction, setInstruction] = useState(`transfer ${USDC_AMOUNT} usdc to ${RECIPIENT_ADDRESS}`);
+  const [instruction, setInstruction] = useState(`transfer ${USDC_AMOUNT / (10**6)} usdc to ${RECIPIENT_ADDRESS}`);
   const [isSending, setIsSending] = useState(false);
   const [error, setError]       = useState<string | undefined>();
   const [txUrl, setTxUrl]       = useState<string>();
@@ -28,7 +28,7 @@ export default function UsdcTransferCard() {
     const regex = /([\d.]+)\s*usdc.*(0x[a-fA-F0-9]{40})/i;
     const m = instruction.match(regex);
     if (m) {
-      setAmount(parseFloat(m[1]));
+      setAmount(USDC_AMOUNT);
       setRecip(m[2] as Address);
     }
   }, [instruction]);
@@ -43,6 +43,7 @@ export default function UsdcTransferCard() {
     setError(undefined);
     
     try {
+      console.log(amount);
       const response = await fetch('/api/sessions/transfer', {
         method: 'POST',
         headers: {
@@ -109,7 +110,7 @@ export default function UsdcTransferCard() {
                   Send USDC
                 </p>
                 <p>
-                  <span className="font-medium text-foreground">Amount:</span> {USDC_AMOUNT} USDC
+                  <span className="font-medium text-foreground">Amount:</span> {USDC_AMOUNT / 10 ** 6} USDC
                 </p>
                 <p className="break-all">
                   <span className="font-medium text-foreground">

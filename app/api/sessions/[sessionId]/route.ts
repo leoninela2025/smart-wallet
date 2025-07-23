@@ -7,6 +7,7 @@ type SessionKeyData = {
   address: string;
   privateKey: string;
   sessionEntityId: number;
+  smartWalletAddress: string;
   hookEntityId: number;
 };
 
@@ -34,7 +35,8 @@ export async function GET(
         validationConfig: {
           entityId: session.sessionEntityId
         }
-      }
+      },
+      smartWalletAddress: session.smartWalletAddress,
     });
     
   } catch (error) {

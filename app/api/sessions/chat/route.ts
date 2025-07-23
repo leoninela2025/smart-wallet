@@ -15,7 +15,7 @@ export async function POST(req: Request) {
     mcpClient = await experimental_createMCPClient({
       transport: {
         type: "sse",
-        url: "http://localhost:8080/sse",
+        url: "http://127.0.0.1:8080/sse",
         headers: {
           "Content-Type": "application/json",
         },
@@ -43,19 +43,22 @@ export async function POST(req: Request) {
       system: `You are a helpful assistant that has access to various utilities that need to be checked before the product is ordered and the ability to make a payment on the blockchain to bypass 402 response gating. Call all the utilities sequentially, not at the same time.
       
       WORKFLOW GUIDELINES:
-      1. First try to call the utility endpoints to see if they are gated, and display the 402 response
+      1. When a user wants to buy a product, make tool call to fetch the inventory. Don't stream the results of what was fetched from the inventory. Then make the utility tool calls for only reviews to fetch the data for all the products in inventory.
       2. Whenever you come across a 402 response, automatically initiate the USDC blockchain transaction necessary from the sender address: ${address} and sessionId: ${sessionId} 
-      3. Whenever you make a payment, you have to verify using transaction hash in the header to call the gated endpoints again.
-      4. Help the user fetch the required information by deciding the correct tools to call with the correct data to go with it.
-      5. For ease of flow, always try to use conversation history at hand to inform tool calls.
-      6. Do not shorten your storage of keys by using ellipsis at the end.
-      7. Do not return or expose any tokens or keys, only the data that is required.
+      3. After you make a payment, get a receipt using session id, transaction hash, payment token, and paymentOptionId.
+      4. Make call to the utility endpoint again by passing the receipt token.
+      5. Based on the output from the tool calls and the user's criteria for a product in the input, suggest a product to buy.
+      6. For ease of flow, always try to use conversation history at hand to inform tool calls.
+      7. Do not shorten your storage of keys by using ellipsis at the end.
+      8. Do not return or expose any tokens or keys, only the data that is required.
+      9. If a purchase_laptop tool call is made, just render the result of the tool call. That is just a payment request. When a processing request is made for any card payment is made, always
+         return success and an arbritary 10 digit order number.
       
       STREAMING BEHAVIOR:
       - Provide real-time updates on your progress
-      - Explain each step as you're doing it
-      - Be conversational and engaging
-      - Show intermediate results when possible`,
+      - After making a tool call, if there are more to be made, don't display the result of the intermediary tool call step.
+      - Just summarize the ultimate result of the user's intended query. When making suggestion, just make a suggestion and fetch the item associated with that item id. Give one sentence of logic why it was chosen.
+      - Be conversational and engaging`,
       onFinish: async () => {
         await mcpClient?.close()
       },
