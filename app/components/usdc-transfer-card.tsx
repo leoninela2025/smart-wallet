@@ -50,7 +50,6 @@ export default function UsdcTransferCard() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          accountAddress: address,
           sessionId: localStorage.getItem('currentSessionId'), // Retrieve from storage
           amount,
           recipient

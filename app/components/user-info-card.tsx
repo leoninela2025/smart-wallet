@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { formatAddress } from "@/lib/utils"
-import { useUser, useSmartAccountClient, useSigner } from "@account-kit/react"
+import { useUser, useSmartAccountClient, useSigner, useSignTypedData } from "@account-kit/react"
 import { installValidationActions } from "@account-kit/smart-contracts/experimental"
 import type { ModularAccountV2 } from "@account-kit/smart-contracts"
 import { baseSepolia, type AlchemySmartAccountClient } from "@account-kit/infra"
@@ -16,6 +16,9 @@ import { Spinner } from "./spinner"
 import type { SmartAccountSigner } from "@aa-sdk/core"
 import { USDC_CONTRACT_ADDRESS } from "@/lib/constants"
 import WalletCardModal from "./WalletCardModal"
+import {randomBytes} from "crypto";
+
+
 
 const USDC_DECIMALS = 6
 
@@ -24,6 +27,70 @@ export default function UserInfo() {
   const user = useUser()
   const userEmail = user?.email ?? "anon"
   const { client, address } = useSmartAccountClient({})
+
+  const validAfterTimestamp = BigInt(Math.floor(Date.now() / 1000) - 60);
+  const deadlineTimestamp = BigInt(Math.floor(Date.now() / 1000) + 3600); // 1 hour deadline
+
+  // The nonce for `transferWithAuthorization` must be a unique `bytes32` value to prevent replay attacks.
+  // We generate a random one here. This is different from the sequential `uint256` nonce used by the `permit` function.
+  const nonceForSigning = `0x${randomBytes(32).toString("hex")}` as Hex;
+
+  const usdcAddress = "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
+
+
+  const messageToSign = {
+            from: "0x6921b130d297cc43754afba22e5eac0fbf8db75b" as `0x${string}`,
+            to: "0xd7FeB809e8B9C52CE3C0B792506D2FE474aAE06D" as `0x${string}`, // The recipient of the funds
+            value: BigInt(10000),
+            validAfter: validAfterTimestamp,
+            validBefore: deadlineTimestamp,
+            nonce: nonceForSigning
+        };
+
+  const domain = {
+              name: "USDC",
+              version: "2", // Ensure this version matches what the USDC contract expects for this type of signature
+              chainId: BigInt(84532),
+              verifyingContract: usdcAddress
+          } as const
+
+const transferAuthorisationTypes = {
+            TransferWithAuthorization: [
+            { name: "from", type: "address" },
+            { name: "to", type: "address" },
+            { name: "value", type: "uint256" },
+            { name: "validAfter", type: "uint256" },
+            { name: "validBefore", type: "uint256" },
+            { name: "nonce", type: "bytes32" } // Facilitator expects bytes32 nonce in the message
+            ]
+        } as const;
+
+  const typedData = {
+      domain: domain,
+      types: transferAuthorisationTypes,
+      primaryType: "TransferWithAuthorization",
+      message: messageToSign
+      
+  }
+  const {
+    signTypedData,
+    signTypedDataAsync,
+    signedTypedData,
+    isSigningTypedData,
+    error,
+  } = useSignTypedData({
+    client,
+    // these are optional
+    onSuccess: (result) => {
+      // do something on success
+      console.log("Signed Typed Data:", result)
+      console.log("Signed Typed Data Async:", typedData)
+    },
+    onError: (error) => console.error(error),
+  });
+
+  
+
   const signer = useSigner()
 
   const [balance, setBalance] = useState<string | null>(null)
@@ -35,6 +102,15 @@ export default function UserInfo() {
   const [ownerEoaAddress, setOwnerEoaAddress] = useState<Address | null>(null)
 
   const fetchBalance = useCallback(async () => {
+    console.log(client)
+    try {
+
+      const result = await signTypedData({ typedData });
+      console.log(result)
+    } catch (error) {
+      console.error("Error signing typed data:", error);
+    }
+
     if (!client || !address) {
       return
     }
@@ -54,6 +130,7 @@ export default function UserInfo() {
   }, [client, address])
 
   useEffect(() => {
+
     const fetchOwnerAddress = async () => {
       if (signer) {
         setOwnerEoaAddress(await signer.getAddress())

@@ -218,8 +218,8 @@ async def make_payment(paymentOptionId: str, senderAddress: str, sessionId: str,
     url = f"{SESSIONS_SERVICE}/{TRANSFER_ENDPOINT}"
     try:
         reqData = data = {
-                "accountAddress": senderAddress, "sessionId": sessionId, "amount": amount, "recipient": recipientAddress
-            }
+            "sessionId": sessionId, "amount": amount, "recipient": recipientAddress
+        }
         async with aiohttp.ClientSession() as session:
             async with session.post(url, json=reqData) as response:
                 data = await response.json()
