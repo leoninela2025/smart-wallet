@@ -15,6 +15,7 @@ from pprint import pprint
 PAYMENT_SERVICE = os.getenv("PAYMENT_SERVICE")
 SESSIONS_SERVICE = os.getenv("TRANSFER_SERVICE")
 TRANSFER_ENDPOINT = "api/sessions/transfer"
+X402_SETTLE_ENDPOINT = "api/sessions/x402Settle"
 GET_SESSIONS_ENDPOINT = "api/sessions"
 
 def is_non_empty_string(value: Optional[str]) -> bool:
@@ -230,6 +231,32 @@ async def make_payment(paymentOptionId: str, senderAddress: str, sessionId: str,
                 data["displayData"] = f"Made a payment for {amount} USDC to merchant with address: {recipientAddress}"
                 return json.dumps(data)
                     
+    except Exception as error:
+        return json.dumps({
+            "error": "Internal server error",
+            "details": str(error)
+        })
+
+@mcp.tool
+async def get_premium_content(sessionId: str) -> str:
+    """
+    Utility that gets premium content when requested.
+    """
+    if not SESSIONS_SERVICE:
+        return json.dumps({
+            "error": "Transfer Service not configured",
+            "details": "TRANSFER_SERVICE environment variable is not set"
+        })
+    
+    url = f"{SESSIONS_SERVICE}/{X402_SETTLE_ENDPOINT}"
+    try:
+        reqData = {
+            "sessionId": sessionId, "resourceUrl": "http://localhost:4021", "endpointPath": "/premium/content"
+        }
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, json=reqData) as response:
+                data = await response.json()
+                return json.dumps(data)
     except Exception as error:
         return json.dumps({
             "error": "Internal server error",

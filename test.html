@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Viem verifyTypedData Interface</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(15px);
+            border-radius: 24px;
+            padding: 2rem;
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 2rem;
+            font-size: 2.5rem;
+            font-weight: 300;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .form-section {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 1.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .form-section.full-width {
+            grid-column: 1 / -1;
+        }
+
+        .section-title {
+            color: white;
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        input, textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+        }
+
+        input::placeholder, textarea::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: rgba(255, 255, 255, 0.5);
+            background: rgba(255, 255, 255, 0.15);
+            box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
+        }
+
+        textarea {
+            min-height: 120px;
+            resize: vertical;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.8rem;
+        }
+
+        .button {
+            background: linear-gradient(45deg, #ff6b6b, #ffa726);
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 50px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: block;
+            margin: 2rem auto;
+            box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4);
+            min-width: 200px;
+        }
+
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 107, 107, 0.6);
+        }
+
+        .button:active {
+            transform: translateY(0);
+        }
+
+        .button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .result-section {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 1.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            margin-top: 2rem;
+        }
+
+        .result {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 1rem;
+            border-radius: 12px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            margin-top: 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .success {
+            color: #4ade80;
+            border-color: rgba(74, 222, 128, 0.3);
+        }
+
+        .error {
+            color: #f87171;
+            border-color: rgba(248, 113, 113, 0.3);
+        }
+
+        .info {
+            color: #60a5fa;
+            border-color: rgba(96, 165, 250, 0.3);
+        }
+
+        .example-button {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            margin-top: 0.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .example-button:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 0.5rem;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .form-grid {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+            
+            .container {
+                padding: 1rem;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Viem verifyTypedData Interface</h1>
+        
+        <div class="form-grid">
+            <div class="form-section">
+                <h3 class="section-title">📝 Address & Signature</h3>
+                
+                <div class="form-group">
+                    <label for="address">From Address</label>
+                    <input 
+                        type="text" 
+                        id="address" 
+                        placeholder="0x..."
+                        value="0x7FaB86c4bd4510D657Bec02078AcD77D695758d4"
+                    >
+                </div>
+                
+                <div class="form-group">
+                    <label for="signature">Signature</label>
+                    <textarea 
+                        id="signature" 
+                        placeholder="0x..."
+                    ></textarea>
+                </div>
+                
+                <button class="example-button" onclick="loadExampleSignature()">
+                    Load Example Signature
+                </button>
+            </div>
+
+            <div class="form-section">
+                <h3 class="section-title">⚙️ Domain</h3>
+                
+                <div class="form-group">
+                    <label for="domainName">Name</label>
+                    <input type="text" id="domainName" placeholder="USDC" value="USDC">
+                </div>
+                
+                <div class="form-group">
+                    <label for="domainVersion">Version</label>
+                    <input type="text" id="domainVersion" placeholder="2" value="2">
+                </div>
+                
+                <div class="form-group">
+                    <label for="chainId">Chain ID</label>
+                    <input type="number" id="chainId" placeholder="84532" value="84532">
+                </div>
+                
+                <div class="form-group">
+                    <label for="verifyingContract">Verifying Contract</label>
+                    <input 
+                        type="text" 
+                        id="verifyingContract" 
+                        placeholder="0x..."
+                        value="0x036CbD53842c5426634e7929541eC2318f3dCF7e"
+                    >
+                </div>
+            </div>
+
+            <div class="form-section full-width">
+                <h3 class="section-title">📋 Typed Data for Signature Creation</h3>
+                
+                <div class="form-group">
+                    <label for="typedData">
+                        Typed Data JSON (used to create the signature)
+                        <small style="display: block; color: rgba(255,255,255,0.7); font-weight: normal; margin-top: 0.25rem;">
+                            This should be the exact same typed data object that was used when creating the signature
+                        </small>
+                    </label>
+                    <textarea 
+                        id="typedData" 
+                        placeholder='{"types": {"EIP712Domain": [...], "YourType": [...]}, "domain": {...}, "primaryType": "YourType", "message": {...}}'
+                        style="min-height: 200px;"
+                    ></textarea>
+                </div>
+                
+                <button class="example-button" onclick="loadExampleTypedData()">
+                    Load Example Typed Data
+                </button>
+            </div>
+        </div>
+
+        <button class="button" onclick="verifySignature()" id="verifyBtn">
+            🔍 Verify Signature
+        </button>
+
+        <div class="result-section" id="resultSection" style="display: none;">
+            <h3 class="section-title">📊 Verification Result</h3>
+            <div id="result" class="result"></div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/viem/1.19.9/index.global.js"></script>
+    <script>
+        // Example data
+        const exampleTypedData = {
+            types: {
+                EIP712Domain: [
+                    { name: 'name', type: 'string' },
+                    { name: 'version', type: 'string' },
+                    { name: 'chainId', type: 'uint256' },
+                    { name: 'verifyingContract', type: 'address' }
+                ],
+                TransferWithAuthorization: [
+                    { name: 'from', type: 'address' },
+                    { name: 'to', type: 'address' },
+                    { name: 'value', type: 'uint256' },
+                    { name: 'validAfter', type: 'uint256' },
+                    { name: 'validBefore', type: 'uint256' },
+                    { name: 'nonce', type: 'bytes32' }
+                ]
+            },
+            domain: {
+                name: 'USDC',
+                version: '2',
+                chainId: 84532,
+                verifyingContract: '0x036CbD53842c5426634e7929541eC2318f3dCF7e'
+            },
+            primaryType: 'TransferWithAuthorization',
+            message: {
+                from: '0x7FaB86c4bd4510D657Bec02078AcD77D695758d4',
+                to: '0xd7FeB809e8B9C52CE3C0B792506D2FE474aAE06D',
+                value: '10000',
+                validAfter: '1755628978',
+                validBefore: '1755629638',
+                nonce: '0x35ac631d461197e823f13d9a0200aa6a5946995efffe3c121fca230f316eff6d'
+            }
+        };
+
+        const exampleSignature = '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1b';
+
+        function loadExampleTypedData() {
+            document.getElementById('typedData').value = JSON.stringify(exampleTypedData, null, 2);
+        }
+
+        function loadExampleSignature() {
+            document.getElementById('signature').value = exampleSignature;
+        }
+
+        async function verifySignature() {
+            const btn = document.getElementById('verifyBtn');
+            const resultSection = document.getElementById('resultSection');
+            const result = document.getElementById('result');
+
+            // Show loading state
+            btn.disabled = true;
+            btn.innerHTML = '<div class="loading"></div>Verifying...';
+
+            try {
+                // Get form values
+                const address = document.getElementById('address').value.trim();
+                const signature = document.getElementById('signature').value.trim();
+                const typedDataStr = document.getElementById('typedData').value.trim();
+
+                // Validation
+                if (!address) {
+                    throw new Error('Address is required');
+                }
+                if (!signature) {
+                    throw new Error('Signature is required');
+                }
+                if (!typedDataStr) {
+                    throw new Error('Typed data is required');
+                }
+
+                // Parse typed data
+                let typedData;
+                try {
+                    typedData = JSON.parse(typedDataStr);
+                } catch (e) {
+                    throw new Error('Invalid JSON in typed data: ' + e.message);
+                }
+
+                // Verify using viem - the typedData should be the same data used for signing
+                console.log('Verifying with:', { 
+                    address, 
+                    typedData: typedData,
+                    signature 
+                });
+
+                const isValid = await viem.verifyTypedData({
+                    address: address,
+                    domain: typedData.domain,
+                    types: typedData.types,
+                    primaryType: typedData.primaryType,
+                    message: typedData.message,
+                    signature: signature
+                });
+
+                // Show result
+                resultSection.style.display = 'block';
+                result.className = `result ${isValid ? 'success' : 'error'}`;
+                result.innerHTML = `
+                    <div style="font-size: 1.1rem; font-weight: bold; margin-bottom: 1rem;">
+                        ${isValid ? '✅ Signature Valid' : '❌ Signature Invalid'}
+                    </div>
+                    <div><strong>Address:</strong> ${address}</div>
+                    <div><strong>Result:</strong> ${isValid}</div>
+                    <div><strong>Timestamp:</strong> ${new Date().toISOString()}</div>
+                    <div style="margin-top: 1rem;"><strong>Signature:</strong></div>
+                    <div style="word-break: break-all; font-size: 0.8rem; margin-top: 0.5rem;">${signature}</div>
+                `;
+
+            } catch (error) {
+                console.error('Verification error:', error);
+                
+                resultSection.style.display = 'block';
+                result.className = 'result error';
+                result.innerHTML = `
+                    <div style="font-size: 1.1rem; font-weight: bold; margin-bottom: 1rem;">
+                        ❌ Verification Error
+                    </div>
+                    <div><strong>Error:</strong> ${error.message}</div>
+                    <div><strong>Timestamp:</strong> ${new Date().toISOString()}</div>
+                `;
+            } finally {
+                // Reset button
+                btn.disabled = false;
+                btn.innerHTML = '🔍 Verify Signature';
+            }
+        }
+
+        // Load example data on page load
+        window.onload = function() {
+            loadExampleTypedData();
+        };
+
+        // Auto-update domain fields when typed data changes (for convenience)
+        document.getElementById('typedData').addEventListener('input', function() {
+            try {
+                const data = JSON.parse(this.value);
+                if (data.domain) {
+                    if (data.domain.name) document.getElementById('domainName').value = data.domain.name;
+                    if (data.domain.version) document.getElementById('domainVersion').value = data.domain.version;
+                    if (data.domain.chainId) document.getElementById('chainId').value = data.domain.chainId;
+                    if (data.domain.verifyingContract) document.getElementById('verifyingContract').value = data.domain.verifyingContract;
+                }
+            } catch (e) {
+                // Ignore JSON parsing errors during typing
+            }
+        });
+    </script>
+</body>
+</html>

@@ -83,8 +83,8 @@ const transferAuthorisationTypes = {
     // these are optional
     onSuccess: (result) => {
       // do something on success
-      console.log("Signed Typed Data:", result)
-      console.log("Signed Typed Data Async:", typedData)
+      // console.log("Signed Typed Data:", result)
+      // console.log("Signed Typed Data Async:", typedData)
     },
     onError: (error) => console.error(error),
   });

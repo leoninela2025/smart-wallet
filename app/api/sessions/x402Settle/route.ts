@@ -2,17 +2,8 @@ import { LocalAccountSigner } from "@aa-sdk/core";
 import fs from "fs";
 import { NextResponse } from "next/server";
 import path from "path";
-import { fetchWithX402Payment } from "./x402-client";
+import { decodeXPaymentResponse, wrapFetchWithPayment } from "x402-fetch";
 
-
-
-type Response = {
-    success: boolean;
-    transaction?: string;
-    errorReason?: string;
-    network: string;
-    payer: string;
-}
 type SessionKeyData = {
     id: string;
     address: string;
@@ -25,13 +16,6 @@ type SessionKeyData = {
 export async function POST(request: Request) {
 
     try {
-
-        const raw = fs.readFileSync("client.json", "utf-8");
-        const client = JSON.parse(raw);
-
-
-        console.log("Using account:", client, typeof client);
-
 
         const { sessionId, resourceUrl, endpointPath } = await request.json();
     
@@ -52,30 +36,30 @@ export async function POST(request: Request) {
                 { status: 404 }
             );
         }
-    
-        const sessionKeySigner = LocalAccountSigner.privateKeyToAccountSigner(
-            session.privateKey as `0x${string}`
-        );
 
-        const response = await fetchWithX402Payment(
-            session.privateKey as `0x${string}`,
-            resourceUrl,
-            endpointPath
-        );
+        const url = `${resourceUrl}${endpointPath}`;
+        const account = LocalAccountSigner.privateKeyToAccountSigner(session.privateKey as `0x${string}`);
+        const wallet = account.inner;
 
-        if (
-            !response ||
-            typeof response !== "object" ||
-            response === null ||
-            !("transaction" in response)
-        ) {
-            return NextResponse.json({ error: "Failed to fetch payment response" }, { status: 500 });
+        const fetchWithPayment = wrapFetchWithPayment(fetch, wallet);
+
+        try {
+            const response = await fetchWithPayment(url, {
+                method: "GET",
+            });
+
+            const body = await response.json();
+            console.log(body);
+
+            const paymentResponse = decodeXPaymentResponse(response.headers.get("x-payment-response")!);
+            console.log(paymentResponse);
+
+            return NextResponse.json(body, { status: 200 });
+        } catch (error: any) {
+            console.log(error);
+            console.error(error.response?.data?.error);
+            return NextResponse.json({ error: "Failed to make transaction" }, { status: 500 });
         }
-
-        return NextResponse.json({
-            success: true,
-            transactionHash: (response as { transaction: string }).transaction,
-        });
     } catch (error) {
         console.error("Error making transaction using facilitator:", error);
         return NextResponse.json({ error: "Failed to make transaction" }, { status: 500 });

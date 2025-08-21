@@ -8,6 +8,7 @@ import UsdcTransferCard from "./components/usdc-transfer-card";
 import LogisticsChatbot from "./components/logistics-chatbot";
 
 import { useEffect, useState } from "react";
+import ViemVerifyComponent from "./components/VerifySig";
 
 export default function Page() {
   const signerStatus = useSignerStatus();
@@ -43,6 +44,7 @@ export default function Page() {
         <main className="container mx-auto px-4 py-8 h-full">
           {signerStatus.isConnected ? (
             <div className="flex flex-col gap-8">
+              <ViemVerifyComponent/>
               <UserInfoCard />
               <UsdcTransferCard/>
               {sessionId && <LogisticsChatbot />}
